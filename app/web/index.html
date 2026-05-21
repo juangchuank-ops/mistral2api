@@ -1,0 +1,1077 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mistral2api - Management Panel</title>
+<style>
+:root {
+  --bg: #0d0d0d;
+  --card: #161616;
+  --card-hover: #1e1e1e;
+  --border: #2a2a2a;
+  --border-focus: #f97316;
+  --text: #e5e5e5;
+  --muted: #777;
+  --accent: #f97316;
+  --accent-hover: #ea580c;
+  --accent-dim: rgba(249,115,22,0.12);
+  --success: #22c55e;
+  --success-dim: rgba(34,197,94,0.12);
+  --error: #ef4444;
+  --error-dim: rgba(239,68,68,0.12);
+  --info: #3b82f6;
+  --info-dim: rgba(59,130,246,0.12);
+  --radius: 6px;
+  --radius-lg: 10px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.4);
+  --font-mono: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Disclaimer Banner */
+.disclaimer-banner {
+  background: linear-gradient(135deg, rgba(239,68,68,0.08), rgba(249,115,22,0.06));
+  border-bottom: 1px solid rgba(239,68,68,0.25);
+  padding: 10px 20px;
+  font-size: 12px;
+  color: #fca5a5;
+  text-align: center;
+  flex-shrink: 0;
+}
+.disclaimer-banner strong { color: var(--error); }
+.disclaimer-banner .en { display: block; color: var(--muted); margin-top: 3px; font-size: 11px; }
+
+/* Header */
+header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+header h1 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.3px;
+}
+header .meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+header .badge {
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--border);
+  padding: 3px 10px;
+  border-radius: 12px;
+}
+header .lang-toggle {
+  font-size: 11px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 3px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+header .lang-toggle:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+/* Tabs */
+.tabs {
+  display: flex;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 12px 18px;
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.tab-btn .en-label {
+  font-size: 10px;
+  color: var(--muted);
+  margin-left: 4px;
+  opacity: 0.6;
+}
+
+/* Main Content */
+main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  max-width: 960px;
+  width: 100%;
+  margin: 0 auto;
+}
+.tab-panel { display: none; }
+.tab-panel.active { display: block; animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* Cards */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.card h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.card h3 .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.card .subtitle {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+/* Form Elements */
+label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+label .en { color: #555; }
+input[type="text"],
+input[type="number"],
+input[type="password"],
+textarea,
+select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  transition: border-color 0.2s;
+}
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.6;
+}
+select { cursor: pointer; }
+
+/* Buttons */
+.btn-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.btn {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: #fff;
+  padding: 7px 16px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--accent-hover); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn.secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+.btn.secondary:hover { border-color: var(--muted); background: var(--card-hover); }
+.btn.danger {
+  background: transparent;
+  border-color: var(--error);
+  color: var(--error);
+}
+.btn.danger:hover { background: var(--error-dim); }
+.btn.success {
+  background: transparent;
+  border-color: var(--success);
+  color: var(--success);
+}
+.btn.success:hover { background: var(--success-dim); }
+
+/* Status Messages */
+.status-msg {
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  margin-top: 10px;
+  display: none;
+}
+.status-msg.visible { display: block; }
+.status-msg.ok { background: var(--success-dim); color: var(--success); border: 1px solid rgba(34,197,94,0.2); }
+.status-msg.err { background: var(--error-dim); color: var(--error); border: 1px solid rgba(239,68,68,0.2); }
+.status-msg.info { background: var(--info-dim); color: var(--info); border: 1px solid rgba(59,130,246,0.2); }
+
+/* Info Grid */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+.info-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+}
+.info-item .label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.info-item .value {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  font-family: var(--font-mono);
+}
+.info-item .value.accent { color: var(--accent); }
+.info-item .value.success { color: var(--success); }
+.info-item .value.error { color: var(--error); }
+
+/* Model List */
+.model-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.model-tag {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+/* Chat Tab */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 220px);
+  min-height: 400px;
+}
+.chat-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+.chat-controls select { width: 200px; flex-shrink: 0; }
+.chat-controls input { flex: 1; }
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chat-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-shrink: 0;
+}
+.chat-input-row input { flex: 1; }
+.msg-bubble {
+  padding: 10px 14px;
+  border-radius: var(--radius-lg);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  max-width: 85%;
+}
+.msg-bubble.user {
+  background: var(--accent-dim);
+  border: 1px solid rgba(249,115,22,0.2);
+  align-self: flex-end;
+}
+.msg-bubble.assistant {
+  background: var(--card);
+  border: 1px solid var(--border);
+  align-self: flex-start;
+}
+.msg-bubble.error {
+  background: var(--error-dim);
+  border-color: rgba(239,68,68,0.3);
+  color: var(--error);
+  align-self: center;
+  max-width: 95%;
+}
+.chat-status {
+  text-align: center;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 4px;
+}
+.chat-status.active { color: var(--accent); }
+
+/* Toast */
+.toast-container {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  animation: toastIn 0.25s ease, toastOut 0.3s ease 2.7s forwards;
+  max-width: 320px;
+}
+.toast.ok { border-left: 3px solid var(--success); }
+.toast.err { border-left: 3px solid var(--error); }
+.toast.info { border-left: 3px solid var(--info); }
+@keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+@keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-8px); } }
+
+/* Code */
+code {
+  background: var(--bg);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+pre.code-block {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  font-size: 11px;
+  line-height: 1.6;
+  font-family: var(--font-mono);
+  margin: 8px 0;
+}
+
+/* Disclaimer in Status tab */
+.disclaimer-card {
+  border-color: rgba(239,68,68,0.3);
+  background: linear-gradient(135deg, rgba(239,68,68,0.04), var(--card));
+}
+.disclaimer-card h3 { color: var(--error); }
+.disclaimer-card p { font-size: 12px; color: var(--muted); line-height: 1.7; margin-bottom: 6px; }
+.disclaimer-card p.en { color: #555; font-size: 11px; }
+
+/* Responsive */
+@media (max-width: 640px) {
+  main { padding: 12px; }
+  header { padding: 12px 16px; }
+  .tabs { padding: 0 12px; }
+  .tab-btn { padding: 10px 12px; font-size: 12px; }
+  .chat-controls { flex-direction: column; }
+  .chat-controls select { width: 100%; }
+  .info-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <h1>mistral2api</h1>
+  <div class="meta">
+    <span class="badge" id="modeBadge">Guest Mode / 游客模式</span>
+    <button class="lang-toggle" onclick="toggleLang()">EN / 中文</button>
+  </div>
+</header>
+
+<!-- Tabs -->
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('cookie', this)">
+    Cookie 管理<span class="en-label">Cookie</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('settings', this)">
+    设置<span class="en-label">Settings</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('chat', this)">
+    聊天测试<span class="en-label">Chat</span>
+  </button>
+  <button class="tab-btn" onclick="switchTab('status', this)">
+    状态<span class="en-label">Status</span>
+  </button>
+</div>
+
+<!-- Main -->
+<main>
+
+  <!-- Tab 1: Cookie Management -->
+  <div id="tab-cookie" class="tab-panel active">
+
+    <div class="card">
+      <h3><span class="dot"></span> cURL 导入 / cURL Import</h3>
+      <p class="subtitle">从浏览器 DevTools Network 面板复制 cURL 命令，粘贴到下方解析 Cookie</p>
+      <textarea id="curlInput" placeholder="curl 'https://chat.mistral.ai/api/chat' \
+  -H 'cookie: ory_session_...=xxx; csrftoken=yyy' \
+  -H 'content-type: application/json' ..."></textarea>
+      <div class="btn-row">
+        <button class="btn" onclick="parseCurl()">解析 / Parse</button>
+      </div>
+      <div id="curlStatus" class="status-msg"></div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot"></span> 手动输入 / Manual Input</h3>
+      <div style="display:grid; gap:10px;">
+        <div>
+          <label>ory_session 值 <span class="en">(ory_session value)</span></label>
+          <input type="text" id="orySession" placeholder="e.g. mt2_abc123...">
+        </div>
+        <div>
+          <label>csrftoken 值 <span class="en">(csrftoken value)</span></label>
+          <input type="text" id="csrfToken" placeholder="e.g. $2a$10$...">
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="saveCookies()">保存 / Save</button>
+        <button class="btn success" onclick="testCookies()">测试 / Test</button>
+        <button class="btn danger" onclick="clearCookies()">清除 / Clear</button>
+      </div>
+      <div id="cookieStatus" class="status-msg"></div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot"></span> 当前状态 / Current Status</h3>
+      <div class="info-grid" id="cookieInfoGrid">
+        <div class="info-item">
+          <div class="label">Cookie 状态</div>
+          <div class="value" id="cookieState">--</div>
+        </div>
+        <div class="info-item">
+          <div class="label">类型 / Type</div>
+          <div class="value" id="cookieType">--</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn secondary" onclick="refreshCookieStatus()">刷新 / Refresh</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tab 2: Settings -->
+  <div id="tab-settings" class="tab-panel">
+
+    <div class="card">
+      <h3><span class="dot"></span> API 配置 / API Configuration</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="label">API Key</div>
+          <div class="value accent" id="settingApiKey">sk-mistral2api</div>
+        </div>
+        <div class="info-item">
+          <div class="label">当前模式 / Current Mode</div>
+          <div class="value" id="settingMode">--</div>
+        </div>
+        <div class="info-item">
+          <div class="label">服务器地址 / Server</div>
+          <div class="value" id="settingHost">--</div>
+        </div>
+        <div class="info-item">
+          <div class="label">超时 / Timeout (s)</div>
+          <div class="value" id="settingTimeout">--</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot"></span> 可用模型 / Available Models</h3>
+      <p class="subtitle">从 /v1/models 获取的模型列表</p>
+      <div class="model-list" id="settingsModelList">
+        <span class="model-tag">加载中...</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn secondary" onclick="fetchModels()">刷新模型 / Refresh</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tab 3: Chat Test -->
+  <div id="tab-chat" class="tab-panel">
+
+    <div class="chat-container">
+      <div class="chat-controls">
+        <select id="chatModel">
+          <option value="mistral-large-latest">mistral-large-latest</option>
+          <option value="mistral-small-latest">mistral-small-latest</option>
+          <option value="pixtral-large-latest">pixtral-large-latest</option>
+          <option value="codestral-latest">codestral-latest</option>
+          <option value="ministral-8b-latest">ministral-8b-latest</option>
+          <option value="open-mistral-nemo">open-mistral-nemo</option>
+        </select>
+        <button class="btn secondary" onclick="clearChat()" style="flex-shrink:0;">清空 / Clear</button>
+      </div>
+
+      <div class="chat-messages" id="chatMessages">
+        <div class="msg-bubble assistant" style="color:var(--muted);">
+          输入消息开始对话... / Enter a message to start...
+        </div>
+      </div>
+
+      <div class="chat-input-row">
+        <input type="text" id="chatInput" placeholder="输入消息，按 Enter 发送... / Type a message, press Enter..." autofocus>
+        <button class="btn" id="chatSendBtn" onclick="sendChat()">发送 / Send</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tab 4: Status -->
+  <div id="tab-status" class="tab-panel">
+
+    <div class="card">
+      <h3><span class="dot"></span> 健康检查 / Health Check</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="label">服务状态 / Service</div>
+          <div class="value" id="healthStatus">--</div>
+        </div>
+        <div class="info-item">
+          <div class="label">运行模式 / Mode</div>
+          <div class="value" id="healthMode">--</div>
+        </div>
+        <div class="info-item">
+          <div class="label">最后测试 / Last Test</div>
+          <div class="value" id="healthLastTest">--</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" onclick="runHealthCheck()">连接测试 / Connection Test</button>
+      </div>
+      <div id="healthStatusMsg" class="status-msg"></div>
+    </div>
+
+    <div class="card">
+      <h3><span class="dot"></span> 系统状态 / System Status</h3>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="label">可用模型数 / Models</div>
+          <div class="value accent" id="sysModelCount">--</div>
+        </div>
+        <div class="info-item">
+          <div class="label">Cookie 模式 / Cookie Mode</div>
+          <div class="value" id="sysCookieMode">--</div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn secondary" onclick="fetchSystemStatus()">刷新 / Refresh</button>
+      </div>
+      <div id="sysStatusMsg" class="status-msg"></div>
+    </div>
+
+    <div class="card disclaimer-card">
+      <h3>⚠ 免责声明 / Disclaimer</h3>
+      <p>本项目仅供学习和研究使用，严禁用于任何商业或非法目的。本项目通过逆向工程 chat.mistral.ai 网页API实现，并非Mistral AI官方API。使用本项目可能违反Mistral AI服务条款，使用者需自行承担所有风险。本项目为外国网站服务，请确保网络可访问。</p>
+      <p class="en">This project is for educational and research purposes only. It reverse-engineers the chat.mistral.ai web API and is NOT an official Mistral AI API. Usage may violate Mistral AI Terms of Service. Users assume all risks. This is a foreign website service — ensure network accessibility.</p>
+    </div>
+
+  </div>
+
+</main>
+
+<!-- Toast Container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+const API_BASE = window.location.origin;
+const DEFAULT_API_KEY = 'sk-mistral2api';
+let API_KEY = DEFAULT_API_KEY;
+let lang = 'zh';
+let chatHistory = [];
+let isStreaming = false;
+
+// ── Tab Switching ──
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (btn) btn.classList.add('active');
+}
+
+// ── Language Toggle ──
+function toggleLang() {
+  lang = lang === 'zh' ? 'en' : 'zh';
+  toast(lang === 'zh' ? '已切换至中文' : 'Switched to English', 'info');
+}
+
+// ── Toast Notifications ──
+function toast(msg, type) {
+  type = type || 'info';
+  const container = document.getElementById('toastContainer');
+  const el = document.createElement('div');
+  el.className = 'toast ' + type;
+  el.textContent = msg;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+// ── Status Message Helper ──
+function showStatus(elId, msg, type) {
+  const el = document.getElementById(elId);
+  el.textContent = msg;
+  el.className = 'status-msg visible ' + type;
+}
+function hideStatus(elId) {
+  const el = document.getElementById(elId);
+  el.className = 'status-msg';
+}
+
+// ── cURL Parser ──
+function parseCurl() {
+  const curl = document.getElementById('curlInput').value.trim();
+  if (!curl) {
+    showStatus('curlStatus', '请输入 cURL 命令 / Please enter a cURL command', 'err');
+    return;
+  }
+
+  const cookies = {};
+  // Match -H 'cookie: ...' or -H "cookie: ..."
+  const cookieHeaderMatch = curl.match(/-H\s+['"]cookie:\s*([^'"]+)['"]/i);
+  if (cookieHeaderMatch) {
+    const cookieStr = cookieHeaderMatch[1];
+    cookieStr.split(';').forEach(pair => {
+      const [key, ...valParts] = pair.split('=');
+      const k = key.trim();
+      const v = valParts.join('=').trim();
+      if (k && v) cookies[k] = v;
+    });
+  }
+
+  // Also try to find individual cookie values in -H headers
+  const oryMatch = curl.match(/ory_session[_\w]*['"]?\s*[:=]\s*['"]?([^;'"\s]+)/i);
+  const csrfMatch = curl.match(/csrftoken['"]?\s*[:=]\s*['"]?([^;'"\s]+)/i);
+
+  if (Object.keys(cookies).length === 0 && !oryMatch && !csrfMatch) {
+    showStatus('curlStatus', '未找到 Cookie 信息 / No cookies found in cURL command', 'err');
+    return;
+  }
+
+  // Populate manual fields if found
+  if (oryMatch) document.getElementById('orySession').value = oryMatch[1];
+  if (csrfMatch) document.getElementById('csrfToken').value = csrfMatch[1];
+
+  // Send to server for parsing
+  fetch(API_BASE + '/admin/cookie/import_curl', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ curl: curl })
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.cookies) {
+      const keys = Object.keys(data.cookies);
+      showStatus('curlStatus', '解析成功，提取 ' + keys.length + ' 个 Cookie: ' + keys.join(', '), 'ok');
+      toast('cURL 解析成功 / cURL parsed successfully', 'ok');
+      if (data.cookies.ory_session) document.getElementById('orySession').value = data.cookies.ory_session;
+      if (data.cookies.csrftoken) document.getElementById('csrfToken').value = data.cookies.csrftoken;
+    } else {
+      showStatus('curlStatus', '解析完成 / Parsing complete', 'info');
+      toast('cURL 解析完成', 'info');
+    }
+  })
+  .catch(err => {
+    showStatus('curlStatus', '解析失败: ' + err.message, 'err');
+    toast('解析失败 / Parse failed', 'err');
+  });
+}
+
+// ── Cookie Save ──
+function saveCookies() {
+  const ory = document.getElementById('orySession').value.trim();
+  const csrf = document.getElementById('csrfToken').value.trim();
+
+  if (!ory && !csrf) {
+    showStatus('cookieStatus', '请至少填写一个 Cookie 值 / Please fill at least one field', 'err');
+    return;
+  }
+
+  const payload = {};
+  if (ory && csrf) {
+    payload.ory_session = ory;
+    payload.csrftoken = csrf;
+  } else {
+    // Build cookie string
+    const parts = [];
+    if (ory) parts.push('ory_session=' + ory);
+    if (csrf) parts.push('csrftoken=' + csrf);
+    payload.cookies = parts.join('; ');
+  }
+
+  fetch(API_BASE + '/admin/cookie/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(data => {
+    showStatus('cookieStatus', 'Cookie 保存成功 / Cookies saved successfully', 'ok');
+    toast('Cookie 已保存 / Cookies saved', 'ok');
+    refreshCookieStatus();
+  })
+  .catch(err => {
+    showStatus('cookieStatus', '保存失败: ' + err.message, 'err');
+    toast('保存失败 / Save failed', 'err');
+  });
+}
+
+// ── Cookie Test ──
+function testCookies() {
+  showStatus('cookieStatus', '正在测试 Cookie... / Testing cookies...', 'info');
+  fetch(API_BASE + '/admin/cookie/test', { method: 'POST' })
+  .then(r => r.json())
+  .then(data => {
+    if (data.valid) {
+      showStatus('cookieStatus', 'Cookie 有效 / Cookie is valid: ' + (data.message || ''), 'ok');
+      toast('Cookie 测试通过 / Test passed', 'ok');
+    } else {
+      showStatus('cookieStatus', 'Cookie 无效 / Cookie invalid: ' + (data.message || ''), 'err');
+      toast('Cookie 测试失败 / Test failed', 'err');
+    }
+    refreshCookieStatus();
+  })
+  .catch(err => {
+    showStatus('cookieStatus', '测试失败: ' + err.message, 'err');
+    toast('测试失败 / Test failed', 'err');
+  });
+}
+
+// ── Cookie Clear ──
+function clearCookies() {
+  fetch(API_BASE + '/admin/cookie', { method: 'DELETE' })
+  .then(r => r.json())
+  .then(data => {
+    showStatus('cookieStatus', 'Cookie 已清除 / Cookies cleared', 'ok');
+    toast('Cookie 已清除 / Cookies cleared', 'ok');
+    document.getElementById('orySession').value = '';
+    document.getElementById('csrfToken').value = '';
+    refreshCookieStatus();
+  })
+  .catch(err => {
+    showStatus('cookieStatus', '清除失败: ' + err.message, 'err');
+    toast('清除失败 / Clear failed', 'err');
+  });
+}
+
+// ── Refresh Cookie Status ──
+function refreshCookieStatus() {
+  fetch(API_BASE + '/admin/cookie')
+  .then(r => r.json())
+  .then(data => {
+    const stateEl = document.getElementById('cookieState');
+    const typeEl = document.getElementById('cookieType');
+    if (data.has_cookies) {
+      stateEl.textContent = '已设置 / Set';
+      stateEl.className = 'value success';
+      typeEl.textContent = data.type || 'manual';
+    } else {
+      stateEl.textContent = '未设置 / Not set';
+      stateEl.className = 'value error';
+      typeEl.textContent = 'guest';
+    }
+    // Update header badge
+    const badge = document.getElementById('modeBadge');
+    badge.textContent = data.has_cookies ? 'Cookie Mode / Cookie模式' : 'Guest Mode / 游客模式';
+    // Update settings
+    const modeEl = document.getElementById('settingMode');
+    if (modeEl) modeEl.textContent = data.has_cookies ? 'Cookie 模式' : 'Guest 模式';
+  })
+  .catch(() => {
+    document.getElementById('cookieState').textContent = '获取失败';
+    document.getElementById('cookieState').className = 'value error';
+  });
+}
+
+// ── Fetch Models ──
+function fetchModels() {
+  fetch(API_BASE + '/v1/models', {
+    headers: { 'Authorization': 'Bearer ' + API_KEY }
+  })
+  .then(r => r.json())
+  .then(data => {
+    const list = document.getElementById('settingsModelList');
+    if (data.data && data.data.length > 0) {
+      list.innerHTML = data.data.map(m =>
+        '<span class="model-tag">' + m.id + '</span>'
+      ).join('');
+      // Also update chat model dropdown
+      const chatModel = document.getElementById('chatModel');
+      const currentVal = chatModel.value;
+      chatModel.innerHTML = data.data.map(m =>
+        '<option value="' + m.id + '"' + (m.id === currentVal ? ' selected' : '') + '>' + m.id + '</option>'
+      ).join('');
+      toast('模型已更新 / Models updated', 'ok');
+    } else {
+      list.innerHTML = '<span class="model-tag">无可用模型 / No models</span>';
+    }
+  })
+  .catch(err => {
+    document.getElementById('settingsModelList').innerHTML =
+      '<span class="model-tag" style="color:var(--error)">获取失败 / Failed</span>';
+    toast('获取模型失败 / Failed to fetch models', 'err');
+  });
+}
+
+// ── Chat ──
+const chatInput = document.getElementById('chatInput');
+const chatMessages = document.getElementById('chatMessages');
+const chatSendBtn = document.getElementById('chatSendBtn');
+
+chatInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChat();
+  }
+});
+
+function addChatBubble(role, content) {
+  const div = document.createElement('div');
+  div.className = 'msg-bubble ' + role;
+  div.textContent = content;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return div;
+}
+
+function addChatStatus(text) {
+  const div = document.createElement('div');
+  div.className = 'chat-status active';
+  div.textContent = text;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  return div;
+}
+
+function removeChatStatus(el) {
+  if (el) el.remove();
+}
+
+function sendChat() {
+  const prompt = chatInput.value.trim();
+  if (!prompt || isStreaming) return;
+
+  isStreaming = true;
+  chatInput.value = '';
+  chatSendBtn.disabled = true;
+
+  addChatBubble('user', prompt);
+  chatHistory.push({ role: 'user', content: prompt });
+
+  const model = document.getElementById('chatModel').value;
+  const statusEl = addChatStatus('Mistral 思考中... / Thinking...');
+  const assistantDiv = addChatBubble('assistant', '');
+  let fullText = '';
+
+  fetch(API_BASE + '/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': 'Bearer ' + API_KEY,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: model,
+      messages: chatHistory,
+      stream: true
+    })
+  })
+  .then(resp => {
+    if (!resp.ok) {
+      return resp.json().then(err => {
+        throw new Error(err.error?.message || 'HTTP ' + resp.status);
+      });
+    }
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    function read() {
+      return reader.read().then(({ done, value }) => {
+        if (done) return;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (data === '[DONE]') return;
+          try {
+            const json = JSON.parse(data);
+            const content = json.choices?.[0]?.delta?.content;
+            if (content) {
+              fullText += content;
+              assistantDiv.textContent = fullText;
+              chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+          } catch(e) {}
+        }
+        return read();
+      });
+    }
+    return read();
+  })
+  .then(() => {
+    removeChatStatus(statusEl);
+    chatHistory.push({ role: 'assistant', content: fullText });
+  })
+  .catch(err => {
+    removeChatStatus(statusEl);
+    assistantDiv.className = 'msg-bubble error';
+    assistantDiv.textContent = 'Error: ' + err.message;
+    chatHistory.pop();
+  })
+  .finally(() => {
+    isStreaming = false;
+    chatSendBtn.disabled = false;
+    chatInput.focus();
+  });
+}
+
+function clearChat() {
+  chatHistory = [];
+  chatMessages.innerHTML = '<div class="msg-bubble assistant" style="color:var(--muted);">输入消息开始对话... / Enter a message to start...</div>';
+}
+
+// ── Health Check ──
+function runHealthCheck() {
+  showStatus('healthStatusMsg', '正在检查... / Checking...', 'info');
+  const startTime = Date.now();
+
+  Promise.all([
+    fetch(API_BASE + '/health').then(r => r.json()).catch(() => null),
+    fetch(API_BASE + '/admin/status').then(r => r.json()).catch(() => null)
+  ])
+  .then(([health, status]) => {
+    const elapsed = Date.now() - startTime;
+    const healthEl = document.getElementById('healthStatus');
+    const modeEl = document.getElementById('healthMode');
+    const lastEl = document.getElementById('healthLastTest');
+
+    if (health && health.status === 'ok') {
+      healthEl.textContent = '正常 / OK';
+      healthEl.className = 'value success';
+    } else {
+      healthEl.textContent = '异常 / Error';
+      healthEl.className = 'value error';
+    }
+
+    if (status) {
+      modeEl.textContent = status.mode || '--';
+      if (status.models) {
+        document.getElementById('sysModelCount').textContent = status.models.length;
+        document.getElementById('sysCookieMode').textContent = status.mode || '--';
+      }
+    }
+
+    lastEl.textContent = new Date().toLocaleTimeString();
+    showStatus('healthStatusMsg', '检查完成，耗时 ' + elapsed + 'ms / Check complete in ' + elapsed + 'ms', 'ok');
+    toast('健康检查完成 / Health check complete', 'ok');
+  })
+  .catch(err => {
+    showStatus('healthStatusMsg', '检查失败: ' + err.message, 'err');
+    toast('健康检查失败 / Health check failed', 'err');
+    document.getElementById('healthStatus').textContent = '失败 / Failed';
+    document.getElementById('healthStatus').className = 'value error';
+  });
+}
+
+function fetchSystemStatus() {
+  showStatus('sysStatusMsg', '正在获取... / Fetching...', 'info');
+  fetch(API_BASE + '/admin/status')
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('sysModelCount').textContent = (data.models || []).length;
+    document.getElementById('sysCookieMode').textContent = data.mode || '--';
+    showStatus('sysStatusMsg', '状态已更新 / Status updated', 'ok');
+    toast('状态已刷新 / Status refreshed', 'ok');
+  })
+  .catch(err => {
+    showStatus('sysStatusMsg', '获取失败: ' + err.message, 'err');
+    toast('获取状态失败 / Failed', 'err');
+  });
+}
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', function() {
+  refreshCookieStatus();
+  fetchModels();
+  fetchSystemStatus();
+});
+</script>
+
+</body>
+</html>
