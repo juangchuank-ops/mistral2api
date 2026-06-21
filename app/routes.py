@@ -4,7 +4,6 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-import traceback
 import uuid
 from typing import Dict, Optional
 
@@ -13,6 +12,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from starlette.responses import JSONResponse
 
 from .config import ConfigManager
+from .logger import logger
 from .mistral_client import (
     AVAILABLE_MODELS,
     MistralClient,
@@ -213,35 +213,34 @@ async def _stream_response(
 ):
     """Generate SSE stream for chat completion."""
     cookies = _get_client_cookies()
-    client = MistralClient(
+    role_sent = False
+
+    async with MistralClient(
         timeout=config_manager.config.request_timeout,
         cookies=cookies,
-    )
-    role_sent = False
-    try:
-        async for token in client.chat_stream(prompt, model):
+    ) as client:
+        try:
+            async for token in client.chat_stream(prompt, model):
+                if not role_sent:
+                    yield _build_sse_chunk(chunk_id, model, created, role="assistant")
+                    role_sent = True
+                yield _build_sse_chunk(chunk_id, model, created, content=token)
+
+            # Send final chunk
             if not role_sent:
                 yield _build_sse_chunk(chunk_id, model, created, role="assistant")
-                role_sent = True
-            yield _build_sse_chunk(chunk_id, model, created, content=token)
-
-        # Send final chunk
-        if not role_sent:
-            yield _build_sse_chunk(chunk_id, model, created, role="assistant")
-        yield _build_sse_chunk(chunk_id, model, created, finish_reason="stop")
-        yield "data: [DONE]\n\n"
-    except Exception as e:
-        traceback.print_exc()
-        error_data = json.dumps({
-            "error": {
-                "message": f"Mistral API error: {str(e)}",
-                "type": "upstream_error",
-            }
-        })
-        yield f"data: {error_data}\n\n"
-        yield "data: [DONE]\n\n"
-    finally:
-        await client.close()
+            yield _build_sse_chunk(chunk_id, model, created, finish_reason="stop")
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.error(f"Streaming error for model {model}: {e}", exc_info=True)
+            error_data = json.dumps({
+                "error": {
+                    "message": f"Mistral API error: {str(e)}",
+                    "type": "upstream_error",
+                }
+            })
+            yield f"data: {error_data}\n\n"
+            yield "data: [DONE]\n\n"
 
 
 async def _non_stream_response(
@@ -252,41 +251,46 @@ async def _non_stream_response(
 ):
     """Non-streaming chat completion."""
     cookies = _get_client_cookies()
-    client = MistralClient(
+
+    async with MistralClient(
         timeout=config_manager.config.request_timeout,
         cookies=cookies,
-    )
-    try:
-        full_text, _ = await client.chat_complete(prompt, model)
-        return ChatCompletionResponse(
-            id=chunk_id,
-            created=created,
-            model=model,
-            choices=[
-                ChatCompletionChoiceNonStream(
-                    message=ChatCompletionMessage(content=full_text),
-                    finish_reason="stop",
-                )
-            ],
-            usage=Usage(
-                prompt_tokens=len(prompt.split()),
-                completion_tokens=len(full_text.split()),
-                total_tokens=len(prompt.split()) + len(full_text.split()),
-            ),
-        )
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=502,
-            detail=ErrorResponse(
-                error=ErrorDetail(
-                    message=f"Mistral API error: {str(e)}",
-                    type="upstream_error",
-                )
-            ).model_dump(),
-        )
-    finally:
-        await client.close()
+    ) as client:
+        try:
+            full_text, _ = await client.chat_complete(prompt, model)
+
+            # Approximate token count (rough estimate: ~4 chars per token)
+            # Note: This is not accurate - real tokenization requires a proper tokenizer
+            prompt_tokens = max(1, len(prompt) // 4)
+            completion_tokens = max(1, len(full_text) // 4)
+
+            return ChatCompletionResponse(
+                id=chunk_id,
+                created=created,
+                model=model,
+                choices=[
+                    ChatCompletionChoiceNonStream(
+                        message=ChatCompletionMessage(content=full_text),
+                        finish_reason="stop",
+                    )
+                ],
+                usage=Usage(
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=prompt_tokens + completion_tokens,
+                ),
+            )
+        except Exception as e:
+            logger.error(f"Non-streaming error for model {model}: {e}", exc_info=True)
+            raise HTTPException(
+                status_code=502,
+                detail=ErrorResponse(
+                    error=ErrorDetail(
+                        message=f"Mistral API error: {str(e)}",
+                        type="upstream_error",
+                    )
+                ).model_dump(),
+            )
 
 
 # ── Web UI ─────────────────────────────────────────────────────────────
@@ -411,25 +415,24 @@ async def test_cookies():
             "valid": False,
         }
 
-    client = MistralClient(
+    async with MistralClient(
         timeout=30,
         cookies=dict(config_manager.config.cookies),
-    )
-    try:
-        valid = await client.validate_cookies()
-        return {
-            "status": "ok" if valid else "error",
-            "message": "Cookies are valid" if valid else "Cookies are invalid or expired",
-            "valid": valid,
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Test failed: {str(e)}",
-            "valid": False,
-        }
-    finally:
-        await client.close()
+    ) as client:
+        try:
+            valid = await client.validate_cookies()
+            return {
+                "status": "ok" if valid else "error",
+                "message": "Cookies are valid" if valid else "Cookies are invalid or expired",
+                "valid": valid,
+            }
+        except Exception as e:
+            logger.error(f"Cookie test failed: {e}", exc_info=True)
+            return {
+                "status": "error",
+                "message": f"Test failed: {str(e)}",
+                "valid": False,
+            }
 
 
 @router.delete("/admin/cookie")

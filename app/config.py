@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
 
+from .logger import logger
+
 
 @dataclass
 class AppConfig:
@@ -63,8 +65,11 @@ class ConfigManager:
                 data = json.loads(self.cookies_file.read_text(encoding="utf-8"))
                 if isinstance(data, dict) and data:
                     self.config.cookies.update(data)
-            except (json.JSONDecodeError, OSError):
-                pass
+                    logger.info(f"Loaded {len(data)} cookies from {self.cookies_file}")
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse cookies file {self.cookies_file}: {e}")
+            except OSError as e:
+                logger.warning(f"Failed to read cookies file {self.cookies_file}: {e}")
 
     def save_cookies(self) -> None:
         """Persist current cookies to cookies.json on disk."""
@@ -74,8 +79,9 @@ class ConfigManager:
                     json.dumps(self.config.cookies, indent=2),
                     encoding="utf-8",
                 )
-            except OSError:
-                pass
+                logger.info(f"Saved {len(self.config.cookies)} cookies to {self.cookies_file}")
+            except OSError as e:
+                logger.error(f"Failed to save cookies to {self.cookies_file}: {e}")
 
     def set_cookies(self, cookies: Dict[str, str]) -> None:
         """Update cookies and persist to disk."""
@@ -90,8 +96,9 @@ class ConfigManager:
         try:
             if self.cookies_file.exists():
                 self.cookies_file.unlink()
-        except OSError:
-            pass
+                logger.info(f"Deleted cookies file {self.cookies_file}")
+        except OSError as e:
+            logger.error(f"Failed to delete cookies file {self.cookies_file}: {e}")
 
     def is_valid_cookie(self) -> bool:
         """Check if cookies exist and are not empty."""

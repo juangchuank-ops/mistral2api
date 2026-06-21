@@ -12,6 +12,8 @@ from typing import AsyncIterator, Dict, Optional
 
 import httpx
 
+from .logger import logger
+
 CHAT_API_URL = "https://chat.mistral.ai/api/chat"
 NEW_CHAT_URL = "https://chat.mistral.ai/api/trpc/message.newChat?batch=1"
 SITE_URL = "https://chat.mistral.ai/chat"
@@ -44,6 +46,11 @@ class MistralClient:
 
     Supports both guest mode (auto session init) and cookie-based auth
     (for logged-in users who provide their own session cookies).
+
+    Supports async context manager protocol for automatic cleanup:
+        async with MistralClient(cookies=cookies) as client:
+            async for token in client.chat_stream(prompt, model):
+                print(token)
     """
 
     def __init__(
@@ -85,6 +92,15 @@ class MistralClient:
         if self._client:
             await self._client.aclose()
             self._client = None
+            logger.debug("MistralClient closed")
+
+    async def __aenter__(self) -> "MistralClient":
+        """Async context manager entry."""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Async context manager exit - ensures cleanup."""
+        await self.close()
 
     def _resolve_model(self, model: str) -> str:
         """Map user-facing model name to internal model ID."""
@@ -96,6 +112,7 @@ class MistralClient:
         Returns the cookies acquired from the session (ory_session_*, csrftoken, etc.).
         """
         client = await self._get_client()
+        logger.info("Initializing guest session...")
         resp = await client.get(SITE_URL)
         resp.raise_for_status()
 
@@ -105,6 +122,7 @@ class MistralClient:
             cookies[cookie.name] = cookie.value
 
         self._guest_initialized = True
+        logger.info(f"Guest session initialized with {len(cookies)} cookies")
         return cookies
 
     def _extract_csrf_token(self) -> Optional[str]:
@@ -135,8 +153,11 @@ class MistralClient:
         try:
             client = await self._get_client()
             resp = await client.get(SITE_URL, follow_redirects=True)
-            return resp.status_code == 200
-        except Exception:
+            valid = resp.status_code == 200
+            logger.debug(f"Cookie validation result: {valid}")
+            return valid
+        except Exception as e:
+            logger.warning(f"Cookie validation failed: {e}")
             return False
 
     async def _ensure_session(self) -> None:
@@ -253,19 +274,14 @@ class MistralClient:
             # Non-text chunks (metadata, done signals, etc.) — skip
             return None
 
-        # Content is JSON-quoted: strip surrounding quotes, unescape
-        if len(content_raw) >= 2 and content_raw.startswith('"') and content_raw.endswith('"'):
-            content = content_raw[1:-1]
-        else:
-            content = content_raw
-
-        # Unescape JSON escape sequences
-        content = content.replace("\\n", "\n")
-        content = content.replace("\\t", "\t")
-        content = content.replace("\\\\", "\\")
-        content = content.replace('\\"', '"')
-
-        return content if content else None
+        # Content is JSON-quoted string - use json.loads for proper unescaping
+        try:
+            content = json.loads(content_raw)
+            return content if content else None
+        except json.JSONDecodeError:
+            # Fallback: if it's not valid JSON, treat as plain text
+            logger.warning(f"Failed to parse SSE chunk as JSON: {content_raw[:100]}")
+            return content_raw if content_raw else None
 
     async def _chat_stream_once(
         self,
